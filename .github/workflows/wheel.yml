@@ -46,7 +46,7 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_MACOS: CI=True VC_ARCH_FLAG=${{ matrix.arch_flag }} MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }} CC=gcc-12 CXX=g++-12 # with GCC
-          #CIBW_ENVIRONMENT_MACOS: CI=True VC_ARCH_FLAG=${{ matrix.arch_flat }} MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }} OpenMP_ROOT=$(brew --prefix)/opt/libomp # with Apple Clang
+          #CIBW_ENVIRONMENT_MACOS: CI=True VC_ARCH_FLAG=${{ matrix.arch_flag }} MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }} OpenMP_ROOT=$(brew --prefix)/opt/libomp # with Apple Clang
           CIBW_BEFORE_ALL_MACOS: brew install fftw lapack gcc@12 libomp openblas
           CIBW_BEFORE_BUILD_MACOS: pip install --upgrade pip setuptools wheel numpy cmake ninja && git config --global --add safe.directory /project
           CIBW_BUILD : cp38-* cp39-* cp310-* cp311-*
