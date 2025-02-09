@@ -1,6 +1,8 @@
 include extern/pybind11/LICENSE
 include src/python.cpp
 include test/virtual-casing.cpp
+include include/virtual-casing.hpp
+include include/virtual-casing.txx
 graft extern/SCTL/include
 graft extern/BIEST/include
 graft extern/pybind11/include
