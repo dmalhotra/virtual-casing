@@ -18,9 +18,9 @@ jobs:
             deployment_target: 14
             arch_flag: "-mcpu=apple-m1"
 
-          - runner: macos-13 # x86_64
-            deployment_target: 13
-            arch_flag: "-march=ivybridge"
+          - runner: macos-15 # arm64
+            deployment_target: 15
+            arch_flag: "-mcpu=apple-m1"
 
     steps:
       - name: Checkout repository
@@ -44,9 +44,7 @@ jobs:
             CI=True
             VC_ARCH_FLAG=${{ matrix.arch_flag }}
           CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel openblas-devel fftw-devel
-          CIBW_BEFORE_BUILD_LINUX: >
-            pip install --upgrade pip setuptools wheel numpy cmake ninja &&
-            git config --global --add safe.directory /project
+          CIBW_BEFORE_BUILD_LINUX: python -m pip install --upgrade pip setuptools wheel numpy cmake ninja && git config --global --add safe.directory /project
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
           CIBW_SKIP: "*-musllinux_*"
           CIBW_ENVIRONMENT_MACOS: >
@@ -55,21 +53,19 @@ jobs:
             MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}
             CC=gcc-12 CXX=g++-12
           CIBW_BEFORE_ALL_MACOS: brew install fftw lapack gcc@12 libomp openblas
-          CIBW_BEFORE_BUILD_MACOS: >
-            pip install --upgrade pip setuptools wheel numpy cmake ninja &&
-            git config --global --add safe.directory /project
-          CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-*
+          CIBW_BEFORE_BUILD_MACOS: python -m pip install --upgrade pip setuptools wheel numpy cmake ninja && git config --global --add safe.directory /project
+          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
 
       - name: Debug with tmate on failure
         if: ${{ failure() }}
         uses: mxschmitt/action-tmate@v3
         with:
-          timeout: 900  # 15 minutes
+          timeout-minutes: 15
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ runner.os }}-${{ runner.arch }}
+          name: wheels-${{ matrix.runner }}
           path: wheelhouse/*.whl
           overwrite: true
 
@@ -87,16 +83,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
       # - name: Install setuptools_scm
       #   run: python -m pip install setuptools_scm
 
       - name: Build sdist
-        run: python setup.py sdist
+        run: |
+          pip install build
+          python -m build --sdist
 
-      - name: Upload sdist
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: sdist
           path: dist/*.tar.gz

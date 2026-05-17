@@ -26,13 +26,40 @@ template <class Real> void VirtualCasing<Real>::Setup(const sctl::Integer digits
   digits_ = digits;
 }
 
+
 template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBext(const std::vector<Real>& B0) const {
+  return ComputeB(B0, true);
+}
+
+template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBextOffSurf(const std::vector<Real>& B0, const std::vector<Real>& Xt, const sctl::Long max_Nt, const sctl::Long max_Np) const {
+  return ComputeBOffSurf(B0, Xt, max_Nt, max_Np, true);
+}
+
+template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradBext(const std::vector<Real>& B0) const {
+  return ComputeGradB(B0, true);
+}
+
+
+template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBint(const std::vector<Real>& B0) const {
+  return ComputeB(B0, false);
+}
+
+template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBintOffSurf(const std::vector<Real>& B0, const std::vector<Real>& Xt, const sctl::Long max_Nt, const sctl::Long max_Np) const {
+  return ComputeBOffSurf(B0, Xt, max_Nt, max_Np, false);
+}
+
+//template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradBint(const std::vector<Real>& B0) const {
+//  return ComputeGradB(B0, false);
+//}
+
+
+template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeB(const std::vector<Real>& B0, bool ext) const {
   SCTL_ASSERT((sctl::Long)B0.size() == COORD_DIM * src_Nt_ * src_Np_);
   SCTL_ASSERT(trg_Nt_ > 0);
   SCTL_ASSERT(trg_Np_ > 0);
 
   if (dosetup) {
-    //BiotSavartFxU.SetupSingular(Svec, biest::BiotSavart3D<Real>::FxU(), digits_, NFP_*(half_period_?2:1), NFP_*(half_period_?2:1)*src_Nt_, src_Np_, (half_period_?2:1)*trg_Nt_, trg_Np_);
+    //BiotSavartFxU.SetupSingular(Svec, biest::BiotSavart3D<Real>::FxU(), digits_, NFP_*(half_period_?2:1), NFP_*(half_period_?2:1)*src_Nt_, src_Np_, trg_Nt_, trg_Np_);
     LaplaceFxdU.SetupSingular(Svec, biest::Laplace3D<Real>::FxdU(), digits_, NFP_*(half_period_?2:1), NFP_*(half_period_?2:1)*src_Nt_, src_Np_, trg_Nt_, trg_Np_);
     quad_Nt_ = LaplaceFxdU.QuadNt();
     quad_Np_ = LaplaceFxdU.QuadNp();
@@ -51,14 +78,15 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBext(const s
   biest::SurfaceOp<Real>::CompleteVecField(B0_, false, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
   biest::SurfaceOp<Real>::Resample(B, quad_Nt_, quad_Np_, B0_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_);
 
-  std::vector<Real> Bext;
-  { // Bext = BiotSavartFxU.Eval(normal x B);
+  std::vector<Real> Bvc;
+  Real sign = (ext ? 1 : -1); // flip sign for internal currents
+  { // Bvc = BiotSavartFxU.Eval(normal x B) * sign;
     sctl::Vector<Real> J;
     CrossProd(J, normal, B);
     if (0) {
-      sctl::Vector<Real> Bext_;
-      BiotSavartFxU.Eval(Bext_, J);
-      Bext.assign(Bext_.begin(), Bext_.end());
+      sctl::Vector<Real> Bvc_;
+      BiotSavartFxU.Eval(Bvc_, -J * sign);
+      Bvc.assign(Bvc_.begin(), Bvc_.end());
     } else {
       const sctl::Long N = trg_Nt_ * trg_Np_;
       sctl::Vector<Real> gradG_J(N * COORD_DIM * COORD_DIM); gradG_J = 0;
@@ -69,38 +97,38 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBext(const s
       LaplaceFxdU.Eval(gradG_J1, sctl::Vector<Real>(J.Dim()/3, J.begin() + (J.Dim()/3)*1, false));
       LaplaceFxdU.Eval(gradG_J2, sctl::Vector<Real>(J.Dim()/3, J.begin() + (J.Dim()/3)*2, false));
 
-      if ((sctl::Long)Bext.size() != N * COORD_DIM) Bext.resize(N * COORD_DIM);
+      if ((sctl::Long)Bvc.size() != N * COORD_DIM) Bvc.resize(N * COORD_DIM);
       for (sctl::Long i = 0; i < N; i++) {
         for (sctl::Integer k = 0; k < COORD_DIM; k++) {
           const sctl::Integer k1 = (k+1)%COORD_DIM;
           const sctl::Integer k2 = (k+2)%COORD_DIM;
-          Bext[k*N+i] = gradG_J[(k1*COORD_DIM+k2)*N+i] - gradG_J[(k2*COORD_DIM+k1)*N+i];
+          Bvc[k*N+i] = (gradG_J[(k1*COORD_DIM+k2)*N+i] - gradG_J[(k2*COORD_DIM+k1)*N+i]) * sign;
         }
       }
     }
   }
-  { // Bext += gradG[B . normal] + B/2
+  { // Bvc += gradG[B . normal] * sign + B/2
     sctl::Vector<Real> B_;
     const sctl::Long trg_Nt__ = (half_period_?2:1)*trg_Nt_;
     biest::SurfaceOp<Real>::Resample(B_, NFP_*trg_Nt__, trg_Np_, B0_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_);
 
-    sctl::Vector<Real> BdotN, Bext_;
+    sctl::Vector<Real> BdotN, Bvc_;
     DotProd(BdotN, B, normal);
-    LaplaceFxdU.Eval(Bext_, BdotN);
+    LaplaceFxdU.Eval(Bvc_, BdotN);
     for (sctl::Long k = 0; k < COORD_DIM; k++) {
       for (sctl::Long i = 0; i < trg_Nt_; i++) {
         for (sctl::Long j = 0; j < trg_Np_; j++) {
-          Bext[(k*trg_Nt_+i)*trg_Np_+j] += Bext_[(k*trg_Nt_+i)*trg_Np_+j] + (Real)0.5 * B_[(k*NFP_*trg_Nt__+i)*trg_Np_+j];
+          Bvc[(k*trg_Nt_+i)*trg_Np_+j] += Bvc_[(k*trg_Nt_+i)*trg_Np_+j] * sign + (Real)0.5 * B_[(k*NFP_*trg_Nt__+i)*trg_Np_+j];
         }
       }
     }
   }
-  return Bext;
+  return Bvc;
 }
 
-template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBextOffSurf(const std::vector<Real>& B0, const std::vector<Real>& Xt) const {
+template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBOffSurf(const std::vector<Real>& B0, const std::vector<Real>& Xt, const sctl::Long max_Nt, const sctl::Long max_Np, bool ext) const {
   SCTL_ASSERT((sctl::Long)B0.size() == COORD_DIM * src_Nt_ * src_Np_);
-  const sctl::Long quad_Nt_ = std::max(src_Nt_, Svec[0].NTor());
+  const sctl::Long quad_Nt_ = std::max(NFP_*(half_period_?2:1)*src_Nt_, Svec[0].NTor());
   const sctl::Long quad_Np_ = std::max(src_Np_, Svec[0].NPol());
 
   sctl::Vector<Real> XX;
@@ -122,40 +150,42 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBextOffSurf(
   DotProd(BdotN, B, normal);
   CrossProd(J, normal, B);
 
-  std::vector<Real> Bext;
-  if (0) { // Bext = BiotSavartFxU.Eval(normal x B);
+  std::vector<Real> Bvc;
+  Real sign = (ext ? 1 : -1); // flip sign for internal currents
+  if (0) { // Bvc = BiotSavartFxU.Eval(normal x B) * sign;
     SCTL_ASSERT(quad_Nt_ >= 13);
     SCTL_ASSERT(quad_Np_ >= 13);
     biest::BoundaryIntegralOp<Real, 3, 3, 1, 6, 1> BiotSavartFxU;
     BiotSavartFxU.SetupSingular(Svec_, biest::BiotSavart3D<Real>::FxU());
 
-    sctl::Vector<Real> Bext_;
-    BiotSavartFxU.EvalOffSurface(Bext_, sctl::Vector<Real>(Xt), J);
-    Bext.assign(Bext_.begin(), Bext_.end());
+    sctl::Vector<Real> Bvc_;
+    BiotSavartFxU.EvalOffSurface(Bvc_, sctl::Vector<Real>(Xt), J * (-sign));
+    Bvc.assign(Bvc_.begin(), Bvc_.end());
   }
-  if (0) { // Bext += gradG[B . normal]
-    sctl::Vector<Real> Bext_;
+  if (0) { // Bvc += gradG[B . normal]
+    sctl::Vector<Real> Bvc_;
     biest::BoundaryIntegralOp<Real, 1, 3, 1, 6, 1> LaplaceFxdU;
     LaplaceFxdU.SetupSingular(Svec_, biest::Laplace3D<Real>::FxdU());
-    LaplaceFxdU.EvalOffSurface(Bext_, sctl::Vector<Real>(Xt), BdotN);
-    for (sctl::Long i = 0; i < Bext_.Dim(); i++) Bext[i] += Bext_[i];
+    LaplaceFxdU.EvalOffSurface(Bvc_, sctl::Vector<Real>(Xt), BdotN);
+    for (sctl::Long i = 0; i < Bvc_.Dim(); i++) Bvc[i] += Bvc_[i] * sign;
   }
   { // Adaptive evaluation
     const auto& X = Svec[0].Coord();
     std::vector<Real> XX(X.begin(), X.end());
     std::vector<Real> J_(J.begin(), J.end());
+    for (auto& j : J_) j = j * (-sign);
 
     std::vector<Real> BdotN_(BdotN.Dim());
-    for (sctl::Long i = 0; i < BdotN.Dim(); i++) BdotN_[i] = -BdotN[i];
+    for (sctl::Long i = 0; i < BdotN.Dim(); i++) BdotN_[i] = BdotN[i] * (-sign);
 
     biest::ExtVacuumField<Real> ext_vacuum;
     ext_vacuum.Setup(digits_, 1, Svec[0].NTor(), Svec[0].NPol(), XX, quad_Nt_, quad_Np_);
-    Bext = ext_vacuum.EvalOffSurface(Xt, BdotN_, J_);
+    Bvc = ext_vacuum.EvalOffSurface(Xt, BdotN_, J_, (half_period_?2:1)*max_Nt, max_Np);
   }
-  return Bext;
+  return Bvc;
 }
 
-template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradBext(const std::vector<Real>& B0) const {
+template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradB(const std::vector<Real>& B0, bool ext) const {
   SCTL_ASSERT((sctl::Long)B0.size() == COORD_DIM * src_Nt_ * src_Np_);
 
   if (dosetup_grad) {
@@ -178,14 +208,16 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradBext(con
   biest::SurfaceOp<Real>::CompleteVecField(B0_, false, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
   biest::SurfaceOp<Real>::Resample(B, grad_quad_Nt_, grad_quad_Np_, B0_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_);
 
-  std::vector<Real> gradBext;
-  { // gradBext = gradBiotSavartFxU.Eval(normal x B);
+  std::vector<Real> gradBvc;
+  Real sign = (ext ? 1 : -1); // flip sign for internal currents
+  SCTL_ASSERT(ext = true); // Hedgehog quadrature currently does not allow flipping the normal vector
+  { // gradBvc = gradBiotSavartFxU.Eval(normal x B) * sign;
     sctl::Vector<Real> J;
     CrossProd(J, normal, B);
     if (0) {
-      sctl::Vector<Real> gradBext_;
-      BiotSavartFxdU.Eval(gradBext_, J);
-      gradBext.assign(gradBext_.begin(), gradBext_.end());
+      sctl::Vector<Real> gradBvc_;
+      BiotSavartFxdU.Eval(gradBvc_, -J * sign);
+      gradBvc.assign(gradBvc_.begin(), gradBvc_.end());
     } else {
       const sctl::Long N = trg_Nt_ * trg_Np_;
       sctl::Vector<Real> gradG_J(N * COORD_DIM * COORD_DIM * COORD_DIM); gradG_J = 0;
@@ -196,34 +228,35 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradBext(con
       LaplaceFxd2U.Eval(gradG_J1, sctl::Vector<Real>(J.Dim()/3, J.begin() + (J.Dim()/3)*1, false));
       LaplaceFxd2U.Eval(gradG_J2, sctl::Vector<Real>(J.Dim()/3, J.begin() + (J.Dim()/3)*2, false));
 
-      if ((sctl::Long)gradBext.size() != COORD_DIM * COORD_DIM * N) gradBext.resize(COORD_DIM * COORD_DIM * N);
+      if ((sctl::Long)gradBvc.size() != COORD_DIM * COORD_DIM * N) gradBvc.resize(COORD_DIM * COORD_DIM * N);
       for (sctl::Long i = 0; i < COORD_DIM*N; i++) {
         for (sctl::Integer k = 0; k < COORD_DIM; k++) {
           const sctl::Integer k1 = (k+1)%COORD_DIM;
           const sctl::Integer k2 = (k+2)%COORD_DIM;
-          gradBext[k*COORD_DIM*N+i] = gradG_J[(k1*COORD_DIM+k2)*COORD_DIM*N+i] - gradG_J[(k2*COORD_DIM+k1)*COORD_DIM*N+i];
+          gradBvc[k*COORD_DIM*N+i] = (gradG_J[(k1*COORD_DIM+k2)*COORD_DIM*N+i] - gradG_J[(k2*COORD_DIM+k1)*COORD_DIM*N+i]) * sign;
         }
       }
     }
   }
-  { // gradBext += gradgradG[B . normal] + B/2
+  { // gradBvc += gradgradG[B . normal] * sign
     sctl::Vector<Real> B_;
     const sctl::Long trg_Nt__ = (half_period_?2:1)*trg_Nt_;
     biest::SurfaceOp<Real>::Resample(B_, NFP_*trg_Nt__, trg_Np_, B0_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_);
 
-    sctl::Vector<Real> BdotN, gradBext_;
+    sctl::Vector<Real> BdotN, gradBvc_;
     DotProd(BdotN, B, normal);
-    LaplaceFxd2U.Eval(gradBext_, BdotN);
+    LaplaceFxd2U.Eval(gradBvc_, BdotN);
     for (sctl::Long k = 0; k < COORD_DIM*COORD_DIM; k++) {
       for (sctl::Long i = 0; i < trg_Nt_; i++) {
         for (sctl::Long j = 0; j < trg_Np_; j++) {
-          gradBext[(k*trg_Nt_+i)*trg_Np_+j] += gradBext_[(k*trg_Nt_+i)*trg_Np_+j];
+          gradBvc[(k*trg_Nt_+i)*trg_Np_+j] += gradBvc_[(k*trg_Nt_+i)*trg_Np_+j] * sign;
         }
       }
     }
   }
-  return gradBext;
+  return gradBvc;
 }
+
 
 template <class Real> std::vector<Real> VirtualCasing<Real>::GetNormal(const sctl::Integer NFP, const bool half_period, const sctl::Long Nt, const sctl::Long Np) const {
   SCTL_ASSERT(Svec[0].NTor() && Svec[0].NPol());
@@ -300,7 +333,7 @@ template <class Real> std::vector<Real> VirtualCasingTestData<Real>::SurfaceCoor
   return X;
 }
 
-template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCasingTestData<Real>::BFieldData(const sctl::Integer NFP, const bool half_period, const sctl::Long surf_Nt, const sctl::Long surf_Np, const std::vector<Real>& X, const sctl::Long trg_Nt, const sctl::Long trg_Np) {
+template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCasingTestData<Real>::BFieldDataOffSurf(const sctl::Integer NFP, const bool half_period, const sctl::Long surf_Nt, const sctl::Long surf_Np, const std::vector<Real>& X, const std::vector<Real>& X_trg) {
   auto WriteVTK_ = [](const std::string& fname, const sctl::Vector<sctl::Vector<Real>>& coords, const sctl::Vector<sctl::Vector<Real>>& values) {
     biest::VTKData data;
     typedef biest::VTKData::VTKReal VTKReal;
@@ -391,37 +424,13 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
     source.PushBack(X);
     density.PushBack(dX);
   };
-  auto DotProd = [](sctl::Vector<Real>& AdotB, const sctl::Vector<Real>& A, const sctl::Vector<Real>& B) {
-    sctl::Long N = A.Dim() / COORD_DIM;
-    SCTL_ASSERT(A.Dim() == COORD_DIM * N);
-    SCTL_ASSERT(B.Dim() == COORD_DIM * N);
-    if (AdotB.Dim() != N) AdotB.ReInit(N);
-    for (sctl::Long i = 0; i < N; i++) {
-      Real AdotB_ = 0;
-      for (sctl::Integer k = 0; k < COORD_DIM; k++) {
-        AdotB_ += A[k*N+i] * B[k*N+i];
-      }
-      AdotB[i] = AdotB_;
-    }
-  };
 
   sctl::Comm comm = sctl::Comm::Self();
-  sctl::Vector<Real> X_surf, X_trg;
-  { // Set X_surf, X_trg
+  sctl::Vector<Real> X_surf;
+  { // Set X_surf
     sctl::Vector<Real> XX;
     biest::SurfaceOp<Real>::CompleteVecField(XX, true, half_period, NFP, surf_Nt, surf_Np, sctl::Vector<Real>(X), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
     biest::SurfaceOp<Real>::Resample(X_surf, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np, XX, NFP*(half_period?2:1)*surf_Nt, surf_Np);
-
-    sctl::Vector<Real> X_surf_shifted, X_trg_;
-    const sctl::Long trg_Nt_ = (half_period?2:1)*trg_Nt;
-    biest::SurfaceOp<Real>::RotateToroidal(X_surf_shifted, X_surf, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np, (half_period?sctl::const_pi<Real>()/(NFP*trg_Nt*2):0));
-    biest::SurfaceOp<Real>::Resample(X_trg_, NFP*trg_Nt_, trg_Np, X_surf_shifted, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np);
-    X_trg.ReInit(COORD_DIM*trg_Nt_*trg_Np);
-    for (sctl::Integer k = 0; k < COORD_DIM; k++) {
-      for (sctl::Long i = 0; i < trg_Nt_*trg_Np; i++) {
-        X_trg[k*trg_Nt_*trg_Np+i] = X_trg_[k*NFP*trg_Nt_*trg_Np+i];
-      }
-    }
   }
 
   sctl::Vector<sctl::Vector<Real>> source0, density0;
@@ -475,8 +484,50 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
     add_source_loop(source1, density1, {X[0],X[1],X[2]}, {Xn[0],Xn[1],Xn[2]}, R);
   }
 
-  const auto Bint_ = eval_BiotSavart(X_trg, source0, density0);
-  const auto Bext_ = eval_BiotSavart(X_trg, source1, density1);
+  const auto Bint_ = eval_BiotSavart(sctl::Vector<Real>(X_trg), source0, density0);
+  const auto Bext_ = eval_BiotSavart(sctl::Vector<Real>(X_trg), source1, density1);
+
+  const sctl::Long Ntrg = X_trg.size() / COORD_DIM;
+  std::vector<Real> Bint(3*Ntrg);
+  std::vector<Real> Bext(3*Ntrg);
+  for (sctl::Integer k = 0; k < COORD_DIM; k++) { // Set Bint, Bext
+    for (sctl::Long i = 0; i < Ntrg; i++) {
+      Bint[k*Ntrg+i] = Bint_[k*Ntrg+i];
+      Bext[k*Ntrg+i] = Bext_[k*Ntrg+i];
+    }
+  }
+
+  if (0) { // Visualization
+    WriteVTK_("loop0", source0, density0);
+    WriteVTK_("loop1", source1, density1);
+  }
+
+  SCTL_UNUSED(WriteVTK_);
+
+  return std::make_tuple(std::move(Bext), std::move(Bint));
+}
+
+template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCasingTestData<Real>::BFieldData(const sctl::Integer NFP, const bool half_period, const sctl::Long surf_Nt, const sctl::Long surf_Np, const std::vector<Real>& X, const sctl::Long trg_Nt, const sctl::Long trg_Np) {
+  std::vector<Real> X_trg;
+  { // Set X_trg
+    sctl::Vector<Real> XX, X_surf;
+    biest::SurfaceOp<Real>::CompleteVecField(XX, true, half_period, NFP, surf_Nt, surf_Np, sctl::Vector<Real>(X), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
+    biest::SurfaceOp<Real>::Resample(X_surf, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np, XX, NFP*(half_period?2:1)*surf_Nt, surf_Np);
+
+    sctl::Vector<Real> X_surf_shifted, X_trg_;
+    const sctl::Long trg_Nt_ = (half_period?2:1)*trg_Nt;
+    biest::SurfaceOp<Real>::RotateToroidal(X_surf_shifted, X_surf, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np, (half_period?sctl::const_pi<Real>()/(NFP*trg_Nt*2):0));
+    biest::SurfaceOp<Real>::Resample(X_trg_, NFP*trg_Nt_, trg_Np, X_surf_shifted, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np);
+    X_trg.resize(COORD_DIM*trg_Nt_*trg_Np);
+    for (sctl::Integer k = 0; k < COORD_DIM; k++) {
+      for (sctl::Long i = 0; i < trg_Nt_*trg_Np; i++) {
+        X_trg[k*trg_Nt_*trg_Np+i] = X_trg_[k*NFP*trg_Nt_*trg_Np+i];
+      }
+    }
+  }
+
+  std::vector<Real> Bint_, Bext_;
+  std::tie(Bext_, Bint_) = BFieldDataOffSurf(NFP, half_period, surf_Nt, surf_Np, X, X_trg);
 
   std::vector<Real> Bint(COORD_DIM*trg_Nt*trg_Np);
   std::vector<Real> Bext(COORD_DIM*trg_Nt*trg_Np);
@@ -490,12 +541,7 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
 
   if (0) { // Visualization
     biest::WriteVTK("B", NFP, half_period, surf_Nt, surf_Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(Bext)+sctl::Vector<Real>(Bint));
-    WriteVTK_("loop0", source0, density0);
-    WriteVTK_("loop1", source1, density1);
   }
-
-  SCTL_UNUSED(WriteVTK_);
-  SCTL_UNUSED(DotProd);
 
   return std::make_tuple(std::move(Bext), std::move(Bint));
 }

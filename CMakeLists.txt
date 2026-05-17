@@ -57,17 +57,6 @@ if (FFTW_FLOAT_OPENMP_FOUND)
     add_definitions (-DSCTL_FFTWF_THREADS)
 endif()
 
-set(Python_FIND_STRATEGY LOCATION)
-# find_package(Python 3 COMPONENTS Interpreter Development.Module NumPy)
-find_package(Python 3 COMPONENTS Interpreter Development.Module)
-
-message(STATUS "Python executable is ${Python_EXECUTABLE}")
-message(STATUS "Python Development Module found value is ${Python_Development.Module_FOUND}")
-message(STATUS "Python header dirs are ${Python_INCLUDE_DIRS}")
-message(STATUS "Python library dirs are ${Python_LIBRARY_DIRS}")
-message(STATUS "Python version is ${Python_VERSION}")
-
-
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
 # Update submodules as needed
@@ -103,52 +92,26 @@ endif()
 
 find_package(OpenMP REQUIRED)
 
-add_subdirectory(extern/pybind11)
-#Python_add_library(${PROJECT_NAME} MODULE src/python.cpp)
-#target_link_libraries(${PROJECT_NAME} PRIVATE pybind11::pybind11)
-pybind11_add_module(${PROJECT_NAME} src/python.cpp)
+if (SKBUILD)
+    find_package(pybind11 CONFIG REQUIRED)
+    pybind11_add_module(${PROJECT_NAME} src/python.cpp)
+    target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CXX_COMPILER_ID:PGI>:-Wc,--pending_instantiations=1000>")
+    target_include_directories(${PROJECT_NAME} PRIVATE "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:${FFTW_INCLUDE_DIRS}>"
+    						       "include" "extern/SCTL/include" "extern/BIEST/include")
+    target_link_libraries(${PROJECT_NAME} PRIVATE "$<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>"
+        "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:FFTW::Double>" "$<$<BOOL:${FFTW_FLOAT_LIB_FOUND}>:FFTW::Float>"
+        "$<$<BOOL:${FFTW_LONGDOUBLE_LIB_FOUND}>:FFTW::LongDouble>" "$<$<BOOL:${FFTW_FLOAT_OPENMP_FOUND}>:FFTW::DoubleOpenMP>"
+        "$<$<BOOL:${BLAS_FOUND}>:${BLAS_LIBRARIES}>" "$<$<BOOL:${LAPACK_FOUND}>:${LAPACK_LIBRARIES}>")
+
+    install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION .)
+endif()
+
 add_executable(vc_testing EXCLUDE_FROM_ALL test/virtual-casing.cpp)
 # Fix for PowerPC with PGI compiler
 target_compile_options(vc_testing PUBLIC "$<$<CXX_COMPILER_ID:PGI>:-Wc,--pending_instantiations=1000>")
-target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CXX_COMPILER_ID:PGI>:-Wc,--pending_instantiations=1000>")
-
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(vc_testing PRIVATE OpenMP::OpenMP_CXX)
-    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
-endif()
-
-if(FFTW_DOUBLE_LIB_FOUND)
-    message(STATUS "FFT DOUBLE FOUND")
-    target_link_libraries(vc_testing PUBLIC FFTW::Double)
-    target_link_libraries(${PROJECT_NAME} PUBLIC FFTW::Double)
-    target_include_directories(vc_testing PRIVATE ${FFTW_INCLUDE_DIRS})
-    target_include_directories(${PROJECT_NAME} PRIVATE ${FFTW_INCLUDE_DIRS})
-endif()
-if (FFTW_FLOAT_LIB_FOUND)
-    target_link_libraries (vc_testing PUBLIC FFTW::Float)
-    target_link_libraries (${PROJECT_NAME} PUBLIC FFTW::Float)
-endif()
-if (FFTW_LONGDOUBLE_LIB_FOUND)
-    target_link_libraries (vc_testing PUBLIC FFTW::LongDouble)
-    target_link_libraries (${PROJECT_NAME} PUBLIC FFTW::LongDouble)
-endif()
-if (FFTW_FLOAT_OPENMP_FOUND)
-    target_link_libraries (vc_testing PUBLIC FFTW::DoubleOpenMP)
-    target_link_libraries (${PROJECT_NAME} PUBLIC FFTW::DoubleOpenMP)
-endif()
-if (BLAS_FOUND)
-	target_link_libraries (vc_testing PRIVATE ${BLAS_LIBRARIES})
-	target_link_libraries (${PROJECT_NAME} PRIVATE ${BLAS_LIBRARIES})
-endif ()
-if (LAPACK_FOUND)
-	target_link_libraries (vc_testing PRIVATE ${LAPACK_LIBRARIES})
-	target_link_libraries (${PROJECT_NAME} PRIVATE ${LAPACK_LIBRARIES})
-endif ()
-
-target_include_directories(vc_testing PRIVATE  "include" "extern/SCTL/include")
-target_include_directories(vc_testing PRIVATE  "include" "extern/BIEST/include")
-target_include_directories(${PROJECT_NAME} PRIVATE  "include" "extern/SCTL/include")
-target_include_directories(${PROJECT_NAME} PRIVATE  "include" "extern/BIEST/include")
-
-get_target_property(INC_DIRS vc_testing INCLUDE_DIRECTORIES)
-message(STATUS "vc_testing include directories are ${INC_DIRS}")
+target_include_directories(vc_testing PRIVATE "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:${FFTW_INCLUDE_DIRS}>"
+					      "include" "extern/SCTL/include" "extern/BIEST/include")
+target_link_libraries(vc_testing PUBLIC $<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:FFTW::Double>
+    $<$<BOOL:${FFTW_FLOAT_LIB_FOUND}>:FFTW::Float> $<$<BOOL:${FFTW_LONGDOUBLE_LIB_FOUND}>:FFTW::LongDouble>
+    $<$<BOOL:${FFTW_FLOAT_OPENMP_FOUND}>:FFTW::DoubleOpenMP> "$<$<BOOL:${BLAS_FOUND}>:${BLAS_LIBRARIES}>"
+    "$<$<BOOL:${LAPACK_FOUND}>:${LAPACK_LIBRARIES}>" $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)

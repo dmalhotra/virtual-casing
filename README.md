@@ -25,11 +25,20 @@ If the compilation is successful, you will have ``vc_testing`` in the ``build`` 
 
 ### Python package
 
-We also need ninja package, which can be installed with pip
+To install the python package use pip:
 
-    pip install ninja
-  
-Then run 
+    python -m pip install .
 
-    python setup.py install
+To build the wheel use:
 
+    python -m build --wheel
+
+which can be installed by:
+
+    pip install dist/virtual_casing*.whl
+
+## Testing
+
+Run the tests using
+
+    python -m unittest test -v
