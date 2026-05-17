@@ -2,7 +2,7 @@
 
 ## Installation
 ### C++ Executable
-In addition to having C++ compiler (tested with GCC-9 and newer) that supports C++11 standard and OpenMP, install FFTW and LAPACK libraries. Intel MKL provides both of them.
+In addition to having C++ compiler (tested with GCC-9 and newer) that supports C++17 standard and OpenMP, install FFTW and LAPACK libraries. Intel MKL provides both of them.
 Also install cmake package. The CMake setup is written in a monolithic way so we have to install python dependencies also,
 even though they are strictly not required. On the python side, we require python header files and Numpy. All of them can be installed by using pip.
 
