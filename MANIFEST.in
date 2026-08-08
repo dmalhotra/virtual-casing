@@ -1,4 +1,5 @@
 include src/python.cpp src/cpu_features.cpp src/__init__.py
+include src/__init__.pyi src/_vc_baseline.pyi src/py.typed
 include test/virtual-casing.cpp
 include LICENSE README.md
 graft include

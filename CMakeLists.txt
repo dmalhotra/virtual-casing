@@ -120,7 +120,9 @@ if (SKBUILD)
 
     pybind11_add_module(_cpu src/cpu_features.cpp) # baseline: must run anywhere
     install(TARGETS _cpu LIBRARY DESTINATION ${PROJECT_NAME})
-    install(FILES src/__init__.py DESTINATION ${PROJECT_NAME})
+    # py.typed opts the package in to PEP 561; without it the stubs are ignored
+    install(FILES src/__init__.py src/__init__.pyi src/_vc_baseline.pyi src/py.typed
+            DESTINATION ${PROJECT_NAME})
 endif()
 
 add_executable(vc_testing EXCLUDE_FROM_ALL test/virtual-casing.cpp)
