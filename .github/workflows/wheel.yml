@@ -53,7 +53,12 @@ jobs:
           CIBW_BUILD: cp310-* cp311-* cp312-* cp313-* cp314-*
           # exercise the repaired wheel, not the source build test.yml already covers
           CIBW_TEST_REQUIRES: numpy scipy
-          CIBW_TEST_COMMAND: python -m unittest discover -s {project}/test -p "test.py"
+          # the runner only reaches the variant its own CPU supports, so also
+          # check the lower ones load rather than leaving them untested
+          CIBW_TEST_COMMAND: >
+            python -m unittest discover -s {project}/test -p "test.py" &&
+            VIRTUAL_CASING_ISA=baseline python -c "import virtual_casing as vc; assert vc.__isa__ == 'baseline'" &&
+            VIRTUAL_CASING_ISA=v3 python -c "import virtual_casing as vc; assert vc.__isa__ == 'v3'"
 
       - name: Debug with tmate on failure
         if: ${{ failure() && github.event_name == 'workflow_dispatch' }}

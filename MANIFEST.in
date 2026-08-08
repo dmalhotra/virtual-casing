@@ -1,4 +1,4 @@
-include src/python.cpp
+include src/python.cpp src/cpu_features.cpp src/__init__.py
 include test/virtual-casing.cpp
 include LICENSE README.md
 graft include

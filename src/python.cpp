@@ -6,8 +6,12 @@
 
 namespace py = pybind11;
 
+// Built once per instruction-set variant; virtual_casing/__init__.py picks one.
+#ifndef VC_MODULE_NAME
+#define VC_MODULE_NAME virtual_casing
+#endif
 
-PYBIND11_MODULE(virtual_casing, m) {
+PYBIND11_MODULE(VC_MODULE_NAME, m) {
     m.doc() = "Virtual casing principle for magnetic field computation.";
 
     py::class_<sctl::Vector<double>>(m, "SCTLDoubleVector")

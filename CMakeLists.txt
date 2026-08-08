@@ -90,15 +90,37 @@ find_package(OpenMP REQUIRED)
 
 if (SKBUILD)
     find_package(pybind11 CONFIG REQUIRED)
-    pybind11_add_module(${PROJECT_NAME} src/python.cpp)
-    target_compile_options(${PROJECT_NAME} PUBLIC "$<$<CXX_COMPILER_ID:PGI>:-Wc,--pending_instantiations=1000>")
-    target_include_directories(${PROJECT_NAME} PRIVATE "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:${FFTW_INCLUDE_DIRS}>"
-    						       "include" "extern/SCTL/include" "extern/BIEST/include")
-    target_link_libraries(${PROJECT_NAME} PRIVATE "$<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>"
-        "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:FFTW::Double>"
-        "$<$<BOOL:${BLAS_FOUND}>:${BLAS_LIBRARIES}>" "$<$<BOOL:${LAPACK_FOUND}>:${LAPACK_LIBRARIES}>")
 
-    install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION .)
+    # SCTL selects its vector ISA at compile time and has no runtime dispatch, so
+    # reaching AVX2/AVX-512 means compiling the extension once per level and
+    # choosing in __init__.py. AVX-512 cannot be a single-wheel target: Intel
+    # fused it off on client CPUs from Alder Lake onwards.
+    option (VC_DISPATCH "Build one extension per x86-64 instruction-set level" ON)
+    set(vc_variants baseline)
+    if (VC_DISPATCH AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        list(APPEND vc_variants v3 v4)
+        set(vc_march_v3 "-march=x86-64-v3")
+        set(vc_march_v4 "-march=x86-64-v4")
+    endif()
+
+    foreach (variant IN LISTS vc_variants)
+        set(tgt _vc_${variant})
+        pybind11_add_module(${tgt} src/python.cpp)
+        target_compile_definitions(${tgt} PRIVATE VC_MODULE_NAME=${tgt})
+        # after CMAKE_CXX_FLAGS, so this -march wins over VC_ARCH_FLAG
+        target_compile_options(${tgt} PRIVATE ${vc_march_${variant}}
+            "$<$<CXX_COMPILER_ID:PGI>:-Wc,--pending_instantiations=1000>")
+        target_include_directories(${tgt} PRIVATE "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:${FFTW_INCLUDE_DIRS}>"
+                                                  "include" "extern/SCTL/include" "extern/BIEST/include")
+        target_link_libraries(${tgt} PRIVATE "$<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>"
+            "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:FFTW::Double>"
+            "$<$<BOOL:${BLAS_FOUND}>:${BLAS_LIBRARIES}>" "$<$<BOOL:${LAPACK_FOUND}>:${LAPACK_LIBRARIES}>")
+        install(TARGETS ${tgt} LIBRARY DESTINATION ${PROJECT_NAME})
+    endforeach()
+
+    pybind11_add_module(_cpu src/cpu_features.cpp) # baseline: must run anywhere
+    install(TARGETS _cpu LIBRARY DESTINATION ${PROJECT_NAME})
+    install(FILES src/__init__.py DESTINATION ${PROJECT_NAME})
 endif()
 
 add_executable(vc_testing EXCLUDE_FROM_ALL test/virtual-casing.cpp)
