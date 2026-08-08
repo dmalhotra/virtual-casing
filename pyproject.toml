@@ -12,8 +12,18 @@ license-files = ["LICENSE"]
 dynamic = ["version"]
 authors = [
     {name = "Dhairya Malhotra"},
+    {name = "Bharat Medasani", email = "mbkumar@gmail.com"},
+    {name = "Matt Landreman"},
+    {name = "Chris Smiet"},
     {name = "Manas Rachh"},
-    {name = "Bharat Medasani", email = "mbkumar@gmail.com"}
+    {name = "Antoine Cerfon"},
+    {name = "Misha Padidar"},
+]
+maintainers = [
+    {name = "Dhairya Malhotra"},
+    {name = "Bharat Medasani"},
+    {name = "Matt Landreman"},
+    {name = "Chris Smiet"},
 ]
 requires-python = ">=3.10"
 classifiers = [
