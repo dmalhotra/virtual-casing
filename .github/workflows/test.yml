@@ -49,9 +49,7 @@ jobs:
     - uses: actions/checkout@v7
       with:
           submodules: recursive
-
-    # - name: Fetch all history for all tags if using scm_version
-    #   run: git fetch --all --tags --prune --unshallow
+          fetch-depth: 0 # setuptools_scm needs the tags
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v7
@@ -92,6 +90,7 @@ jobs:
     - uses: actions/checkout@v7
       with:
           submodules: recursive
+          fetch-depth: 0 # setuptools_scm needs the tags
 
     - name: apt-get stuff needed for compiling
       run: |
