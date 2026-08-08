@@ -41,18 +41,13 @@ if (BLAS_FOUND)
 endif ()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-find_package(FFTW COMPONENTS FLOAT_LIB DOUBLE_LIB LONGDOUBLE_LIB DOUBLE_OPENMP_LIB)
+find_package(FFTW COMPONENTS DOUBLE_LIB DOUBLE_OPENMP_LIB)
 if(FFTW_DOUBLE_LIB_FOUND)
     message(STATUS "FFTW_INCLUDE_DIR is ${FFTW_INCLUDE_DIRS}")
     add_definitions (-DSCTL_HAVE_FFTW)
     include_directories("${FFTW_INCLUDE_DIRS}")
 endif()
-if (FFTW_FLOAT_LIB_FOUND)
-    add_definitions (-DSCTL_HAVE_FFTWF)
-endif()
-if (FFTW_LONGDOUBLE_LIB_FOUND)
-    add_definitions (-DSCTL_HAVE_FFTWL)
-endif()
+# float/long-double FFTW is never called; linking it only bloats the wheel
 if (FFTW_FLOAT_OPENMP_FOUND)
     add_definitions (-DSCTL_FFTWF_THREADS)
 endif()
@@ -99,8 +94,8 @@ if (SKBUILD)
     target_include_directories(${PROJECT_NAME} PRIVATE "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:${FFTW_INCLUDE_DIRS}>"
     						       "include" "extern/SCTL/include" "extern/BIEST/include")
     target_link_libraries(${PROJECT_NAME} PRIVATE "$<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>"
-        "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:FFTW::Double>" "$<$<BOOL:${FFTW_FLOAT_LIB_FOUND}>:FFTW::Float>"
-        "$<$<BOOL:${FFTW_LONGDOUBLE_LIB_FOUND}>:FFTW::LongDouble>" "$<$<BOOL:${FFTW_FLOAT_OPENMP_FOUND}>:FFTW::DoubleOpenMP>"
+        "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:FFTW::Double>"
+        "$<$<BOOL:${FFTW_FLOAT_OPENMP_FOUND}>:FFTW::DoubleOpenMP>"
         "$<$<BOOL:${BLAS_FOUND}>:${BLAS_LIBRARIES}>" "$<$<BOOL:${LAPACK_FOUND}>:${LAPACK_LIBRARIES}>")
 
     install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION .)
@@ -112,6 +107,5 @@ target_compile_options(vc_testing PUBLIC "$<$<CXX_COMPILER_ID:PGI>:-Wc,--pending
 target_include_directories(vc_testing PRIVATE "$<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:${FFTW_INCLUDE_DIRS}>"
 					      "include" "extern/SCTL/include" "extern/BIEST/include")
 target_link_libraries(vc_testing PUBLIC $<$<BOOL:${FFTW_DOUBLE_LIB_FOUND}>:FFTW::Double>
-    $<$<BOOL:${FFTW_FLOAT_LIB_FOUND}>:FFTW::Float> $<$<BOOL:${FFTW_LONGDOUBLE_LIB_FOUND}>:FFTW::LongDouble>
     $<$<BOOL:${FFTW_FLOAT_OPENMP_FOUND}>:FFTW::DoubleOpenMP> "$<$<BOOL:${BLAS_FOUND}>:${BLAS_LIBRARIES}>"
     "$<$<BOOL:${LAPACK_FOUND}>:${LAPACK_LIBRARIES}>" $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
