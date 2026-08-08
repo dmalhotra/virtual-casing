@@ -1,6 +1,6 @@
 name: Wheel Builder
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_wheels:
@@ -14,13 +14,14 @@ jobs:
           - runner: ubuntu-latest # x86_64
             arch_flag: "-march=ivybridge"
 
-          - runner: macos-14 # arm64
-            deployment_target: 14
-            arch_flag: "-mcpu=apple-m1"
-
           - runner: macos-15 # arm64
             deployment_target: 15
             arch_flag: "-mcpu=apple-m1"
+
+          # every Mac that runs macOS 15 has AVX2, so ivybridge is conservative here
+          - runner: macos-15-intel # x86_64
+            deployment_target: 15
+            arch_flag: "-march=ivybridge"
 
     steps:
       - name: Checkout repository
@@ -49,10 +50,13 @@ jobs:
           #CIBW_ENVIRONMENT_MACOS: CI=True VC_ARCH_FLAG=${{ matrix.arch_flat }} MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }} OpenMP_ROOT=$(brew --prefix)/opt/libomp # with Apple Clang
           CIBW_BEFORE_ALL_MACOS: brew install fftw lapack gcc@12 libomp openblas
           CIBW_BEFORE_BUILD_MACOS: python -m pip install --upgrade pip setuptools wheel numpy cmake ninja && git config --global --add safe.directory /project
-          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
+          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-* cp314-*
+          # exercise the repaired wheel, not the source build test.yml already covers
+          CIBW_TEST_REQUIRES: numpy scipy
+          CIBW_TEST_COMMAND: python -m unittest discover -s {project}/test -p "test.py"
 
       - name: Debug with tmate on failure
-        if: ${{ failure() }}
+        if: ${{ failure() && github.event_name == 'workflow_dispatch' }}
         uses: mxschmitt/action-tmate@v3
         with:
           timeout-minutes: 15
@@ -110,3 +114,5 @@ jobs:
           merge-multiple: true
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true # so a re-run after a partial upload doesn't 400
