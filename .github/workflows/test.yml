@@ -79,3 +79,24 @@ jobs:
         cd test
         python -m unittest -v test.py
 
+  # The Makefile builds the C API and the standalone binaries, which nothing
+  # else in CI covers; a link-order bug went unnoticed here for some time.
+  makefile:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+          submodules: recursive
+
+    - name: apt-get stuff needed for compiling
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libfftw3-dev libblas-dev liblapack-dev
+
+    - name: make all
+      run: make all -j$(nproc)
+
+    - name: Run the C API test
+      run: ./bin/virtual-casing-c
+
