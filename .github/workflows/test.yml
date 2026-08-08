@@ -96,7 +96,8 @@ jobs:
     - name: apt-get stuff needed for compiling
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libfftw3-dev libblas-dev liblapack-dev
+        # liblapack-dev pulls a libblas.so provider, so -lblas/-llapack resolve
+        sudo apt-get install -y build-essential libfftw3-dev liblapack-dev libopenblas-dev
 
     - name: make all
       run: make all -j$(nproc)
