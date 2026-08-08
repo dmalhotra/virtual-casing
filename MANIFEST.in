@@ -1,11 +1,8 @@
-include extern/pybind11/LICENSE
 include src/python.cpp
 include test/virtual-casing.cpp
 include LICENSE README.md
 graft include
 graft extern/SCTL/include
 graft extern/BIEST/include
-graft extern/pybind11/include
-graft extern/pybind11/tools
 graft cmake
 global-include CMakeLists.txt *.cmake
