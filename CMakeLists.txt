@@ -27,7 +27,11 @@ if (DEFINED ENV{CONDA_BUILD})
 endif ()
 
 
-find_package (BLAS)
+# Wheels turn this off (pyproject.toml): one N=1 dgemm, no LAPACK, ~80% of wheel size
+option (VC_USE_BLAS "Link BLAS/LAPACK; SCTL falls back to its own routines without them" ON)
+if (VC_USE_BLAS)
+    find_package (BLAS)
+endif ()
 if (BLAS_FOUND)
     add_definitions (-DSCTL_HAVE_BLAS)
     if (NOT ${BLA_VENDOR} MATCHES "^Intel")
