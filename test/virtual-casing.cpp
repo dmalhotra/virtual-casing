@@ -19,7 +19,7 @@ template <class Real> void test(int digits, int NFP, bool half_period, long Nt, 
   //  }
   //}
 
-  const auto print_relative_err = [NFP,half_period,Nt,Np,trg_Nt,trg_Np,&X](const std::string& name, const std::vector<Real>& B, const std::vector<Real>& Bext_ref, const std::vector<Real>& Bext) {
+  const auto print_relative_err = [](const std::string& name, const std::vector<Real>& B, const std::vector<Real>& Bext_ref, const std::vector<Real>& Bext) {
     auto err = Bext;
     Real max_err = 0, max_val = 0;
     for (long i = 0; i < (long)err.size(); i++) err[i] -= Bext_ref[i];
@@ -117,7 +117,7 @@ template <class Real> void test(int digits, int NFP, bool half_period, long Nt, 
       for (long i = 0; i < N-1; i++) {
         for (long j = 0; j < N-1; j++) {
           for (long k = 0; k < N-1; k++) {
-            auto idx = [N](long i, long j, long k) {
+            auto idx = [](long i, long j, long k) {
               return (i*N+j)*N+k;
             };
             vtu_data.connect.PushBack(idx(i+0,j+0,k+0));
