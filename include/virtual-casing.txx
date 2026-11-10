@@ -2,22 +2,24 @@
 // Authors: Dhairya Malhotra, Bharat Medasani
 // SPDX-License-Identifier: Apache-2.0
 
-template <class Real> VirtualCasing<Real>::VirtualCasing() : comm_(sctl::Comm::Self()), BiotSavartFxU(comm_), LaplaceFxdU(comm_), BiotSavartFxdU(comm_), LaplaceFxd2U(comm_), Svec(1), NFP_(0), digits_(10), dosetup(true), dosetup_grad(true) {
+template <class Real> VirtualCasing<Real>::VirtualCasing() : comm_(sctl::Comm::Self()), BiotSavartFxU(comm_), LaplaceFxdU(comm_), BiotSavartFxdU(comm_), LaplaceFxd2U(comm_), Svec(1), NFP_(0), digits_(10), tor_orient_(1), dosetup(true), dosetup_grad(true) {
 }
 
 template <class Real> void VirtualCasing<Real>::Setup(const sctl::Integer digits, const sctl::Integer NFP, const bool half_period, const sctl::Long surf_Nt, const sctl::Long surf_Np, const std::vector<Real>& X, const sctl::Long src_Nt, const sctl::Long src_Np, const sctl::Long trg_Nt, const sctl::Long trg_Np) {
   dosetup = true;
   dosetup_grad = true;
   SCTL_ASSERT(surf_Nt*surf_Np*COORD_DIM == (sctl::Long)X.size());
+  const sctl::Vector<Real> X_view((sctl::Long)X.size(), sctl::Ptr2Itr<Real>((Real*)X.data(), (sctl::Long)X.size()), false);
+  tor_orient_ = biest::SurfaceOp<Real>::ToroidalOrientation(X_view, surf_Nt, surf_Np);
   if (half_period) { // upsample surf_Nt by 1
     sctl::Vector<Real> X0, X1;
     Svec[0] = biest::Surface<Real>(NFP*2*(surf_Nt+1), surf_Np, biest::SurfType::None);
-    biest::SurfaceOp<Real>::CompleteVecField(X0, true, half_period, NFP, surf_Nt, surf_Np, sctl::Vector<Real>(X), -sctl::const_pi<Real>()/(NFP*surf_Nt*2));
+    biest::SurfaceOp<Real>::CompleteVecField(X0, half_period, NFP, surf_Nt, surf_Np, X_view, biest::Parity::Even, tor_orient_, -sctl::const_pi<Real>()/(NFP*surf_Nt*2));
     biest::SurfaceOp<Real>::Resample(X1, NFP*2*(surf_Nt+1), surf_Np, X0, NFP*2*surf_Nt, surf_Np);
     biest::SurfaceOp<Real>::RotateToroidal(Svec[0].Coord(), X1, NFP*2*(surf_Nt+1), surf_Np, sctl::const_pi<Real>()/(NFP*trg_Nt*2));
   } else {
     Svec[0] = biest::Surface<Real>(NFP*surf_Nt, surf_Np, biest::SurfType::None);
-    biest::SurfaceOp<Real>::CompleteVecField(Svec[0].Coord(), true, half_period, NFP, surf_Nt, surf_Np, sctl::Vector<Real>(X), (Real)0);
+    biest::SurfaceOp<Real>::CompleteVecField(Svec[0].Coord(), half_period, NFP, surf_Nt, surf_Np, X_view, biest::Parity::Even, tor_orient_);
   }
 
   NFP_ = NFP;
@@ -61,9 +63,11 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeB(const std:
   SCTL_ASSERT(trg_Nt_ > 0);
   SCTL_ASSERT(trg_Np_ > 0);
 
-  if (dosetup) {
-    //BiotSavartFxU.SetupSingular(Svec, biest::BiotSavart3D<Real>::FxU(), digits_, NFP_*(half_period_?2:1), NFP_*(half_period_?2:1)*src_Nt_, src_Np_, trg_Nt_, trg_Np_);
-    LaplaceFxdU.SetupSingular(Svec, biest::Laplace3D<Real>::FxdU(), digits_, NFP_*(half_period_?2:1), NFP_*(half_period_?2:1)*src_Nt_, src_Np_, trg_Nt_, trg_Np_);
+  sctl::Vector<Real> B0_, B;
+  biest::SurfaceOp<Real>::CompleteVecField(B0_, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), biest::Parity::Odd, tor_orient_, (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
+  if (dosetup) { // for a quadrature grid that resolves B too
+    //BiotSavartFxU.SetupSingular(Svec[0], biest::BiotSavart3D<Real>::FxU(), digits_, NFP_*(half_period_?2:1), trg_Nt_, trg_Np_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_, B0_);
+    LaplaceFxdU.SetupSingular(Svec[0], biest::Laplace3D<Real>::FxdU(), digits_, NFP_*(half_period_?2:1), trg_Nt_, trg_Np_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_, B0_);
     quad_Nt_ = LaplaceFxdU.QuadNt();
     quad_Np_ = LaplaceFxdU.QuadNp();
 
@@ -77,8 +81,6 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeB(const std:
     dosetup = false;
   }
 
-  sctl::Vector<Real> B0_, B;
-  biest::SurfaceOp<Real>::CompleteVecField(B0_, false, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
   biest::SurfaceOp<Real>::Resample(B, quad_Nt_, quad_Np_, B0_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_);
 
   std::vector<Real> Bvc;
@@ -142,7 +144,7 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBOffSurf(con
   SurfOp.SurfNormalAreaElem(&normal, nullptr, dX, &XX);
 
   sctl::Vector<Real> B0_, B;
-  biest::SurfaceOp<Real>::CompleteVecField(B0_, false, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
+  biest::SurfaceOp<Real>::CompleteVecField(B0_, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), biest::Parity::Odd, tor_orient_, (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
   biest::SurfaceOp<Real>::Resample(B, quad_Nt_, quad_Np_, B0_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_);
 
   sctl::Vector<Real> BdotN, J;
@@ -170,9 +172,11 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeBOffSurf(con
 template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradB(const std::vector<Real>& B0, bool ext) const {
   SCTL_ASSERT((sctl::Long)B0.size() == COORD_DIM * src_Nt_ * src_Np_);
 
-  if (dosetup_grad) {
-    //BiotSavartFxdU.SetupSingular(Svec, biest::BiotSavart3D<Real>::FxdU(), digits_, NFP_*(half_period_?2:1), NFP_*(half_period_?2:1)*src_Nt_, src_Np_, (half_period_?2:1)*trg_Nt_, trg_Np_);
-    LaplaceFxd2U.SetupSingular(Svec, biest::Laplace3D<Real>::Fxd2U(), digits_, NFP_*(half_period_?2:1), NFP_*(half_period_?2:1)*src_Nt_, src_Np_, trg_Nt_, trg_Np_);
+  sctl::Vector<Real> B0_, B;
+  biest::SurfaceOp<Real>::CompleteVecField(B0_, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), biest::Parity::Odd, tor_orient_, (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
+  if (dosetup_grad) { // for a quadrature grid that resolves B too
+    //BiotSavartFxdU.SetupSingular(Svec[0], biest::BiotSavart3D<Real>::FxdU(), digits_, NFP_*(half_period_?2:1), (half_period_?2:1)*trg_Nt_, trg_Np_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_, B0_);
+    LaplaceFxd2U.SetupSingular(Svec[0], biest::Laplace3D<Real>::Fxd2U(), digits_, NFP_*(half_period_?2:1), trg_Nt_, trg_Np_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_, B0_);
     grad_quad_Nt_ = LaplaceFxd2U.QuadNt();
     grad_quad_Np_ = LaplaceFxd2U.QuadNp();
 
@@ -186,8 +190,6 @@ template <class Real> std::vector<Real> VirtualCasing<Real>::ComputeGradB(const 
     dosetup_grad = false;
   }
 
-  sctl::Vector<Real> B0_, B;
-  biest::SurfaceOp<Real>::CompleteVecField(B0_, false, half_period_, NFP_, src_Nt_, src_Np_, sctl::Vector<Real>(B0), (half_period_?sctl::const_pi<Real>()*(1/(Real)(NFP_*trg_Nt_*2)-1/(Real)(NFP_*src_Nt_*2)):0));
   biest::SurfaceOp<Real>::Resample(B, grad_quad_Nt_, grad_quad_Np_, B0_, NFP_*(half_period_?2:1)*src_Nt_, src_Np_);
 
   std::vector<Real> gradBvc;
@@ -411,7 +413,8 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
   sctl::Vector<Real> X_surf;
   { // Set X_surf
     sctl::Vector<Real> XX;
-    biest::SurfaceOp<Real>::CompleteVecField(XX, true, half_period, NFP, surf_Nt, surf_Np, sctl::Vector<Real>(X), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
+    const sctl::Vector<Real> X_view((sctl::Long)X.size(), sctl::Ptr2Itr<Real>((Real*)X.data(), (sctl::Long)X.size()), false);
+    biest::SurfaceOp<Real>::CompleteVecField(XX, half_period, NFP, surf_Nt, surf_Np, X_view, biest::Parity::Even, biest::SurfaceOp<Real>::ToroidalOrientation(X_view, surf_Nt, surf_Np), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
     biest::SurfaceOp<Real>::Resample(X_surf, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np, XX, NFP*(half_period?2:1)*surf_Nt, surf_Np);
   }
 
@@ -493,7 +496,8 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
   std::vector<Real> X_trg;
   { // Set X_trg
     sctl::Vector<Real> XX, X_surf;
-    biest::SurfaceOp<Real>::CompleteVecField(XX, true, half_period, NFP, surf_Nt, surf_Np, sctl::Vector<Real>(X), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
+    const sctl::Vector<Real> X_view((sctl::Long)X.size(), sctl::Ptr2Itr<Real>((Real*)X.data(), (sctl::Long)X.size()), false);
+    biest::SurfaceOp<Real>::CompleteVecField(XX, half_period, NFP, surf_Nt, surf_Np, X_view, biest::Parity::Even, biest::SurfaceOp<Real>::ToroidalOrientation(X_view, surf_Nt, surf_Np), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
     biest::SurfaceOp<Real>::Resample(X_surf, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np, XX, NFP*(half_period?2:1)*surf_Nt, surf_Np);
 
     sctl::Vector<Real> X_surf_shifted, X_trg_;
@@ -522,7 +526,7 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
   }
 
   if (0) { // Visualization
-    biest::WriteVTK("B", NFP, half_period, surf_Nt, surf_Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(Bext)+sctl::Vector<Real>(Bint));
+    biest::WriteVTK("B", NFP, half_period, surf_Nt, surf_Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(Bext)+sctl::Vector<Real>(Bint), biest::Parity::Odd);
   }
 
   return std::make_tuple(std::move(Bext), std::move(Bint));
@@ -637,7 +641,8 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
   sctl::Vector<Real> X_surf, X_trg;
   { // Set X_surf, X_trg
     sctl::Vector<Real> XX;
-    biest::SurfaceOp<Real>::CompleteVecField(XX, true, half_period, NFP, surf_Nt, surf_Np, sctl::Vector<Real>(X), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
+    const sctl::Vector<Real> X_view((sctl::Long)X.size(), sctl::Ptr2Itr<Real>((Real*)X.data(), (sctl::Long)X.size()), false);
+    biest::SurfaceOp<Real>::CompleteVecField(XX, half_period, NFP, surf_Nt, surf_Np, X_view, biest::Parity::Even, biest::SurfaceOp<Real>::ToroidalOrientation(X_view, surf_Nt, surf_Np), (half_period?-sctl::const_pi<Real>()/(NFP*surf_Nt*2):0));
     biest::SurfaceOp<Real>::Resample(X_surf, NFP*(half_period?2:1)*(surf_Nt+1), surf_Np, XX, NFP*(half_period?2:1)*surf_Nt, surf_Np);
 
     sctl::Vector<Real> X_surf_shifted, X_trg_;
@@ -717,7 +722,7 @@ template <class Real> std::tuple<std::vector<Real>, std::vector<Real>> VirtualCa
   }
 
   if (0) { // Visualization
-    biest::WriteVTK("GradB", NFP, half_period, surf_Nt, surf_Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(GradBext)+sctl::Vector<Real>(GradBint));
+    biest::WriteVTK("GradB", NFP, half_period, surf_Nt, surf_Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(GradBext)+sctl::Vector<Real>(GradBint), biest::Parity::Even);
     WriteVTK_("loop0", source0, density0);
     WriteVTK_("loop1", source1, density1);
   }

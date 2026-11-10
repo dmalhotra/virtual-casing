@@ -26,7 +26,7 @@ template <class Real> void test(int digits, int NFP, bool half_period, long Nt, 
     for (const auto& x:B  ) max_val = std::max<Real>(max_val,fabs(x));
     for (const auto& x:err) max_err = std::max<Real>(max_err,fabs(x));
     std::cout<<"Maximum relative error ("<<name<<"): "<<max_err / max_val<<'\n';
-    //if (err.size()%(trg_Nt*trg_Np)==0) biest::WriteVTK(("err_"+name).c_str(), NFP, half_period, Nt, Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(err));
+    //if (err.size()%(trg_Nt*trg_Np)==0) biest::WriteVTK(("err_"+name).c_str(), NFP, half_period, Nt, Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(err), biest::Parity::Odd);
   };
 
   // Setup

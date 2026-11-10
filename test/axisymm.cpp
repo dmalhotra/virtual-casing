@@ -74,9 +74,9 @@ template <class Real> void test(const Real R0, const Real a, const Real kappa, i
   }
 
   // Generate VTK visualization
-  biest::WriteVTK("B", NFP, false, Nt, Np, sctl::Vector<Real>(X), src_Nt, src_Np, sctl::Vector<Real>(B));
-  biest::WriteVTK("Bext", NFP, false, Nt, Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(Bext));
-  biest::WriteVTK("Bext_dot_n", NFP, false, Nt, Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(Bext_dot_n));
+  biest::WriteVTK("B", NFP, false, Nt, Np, sctl::Vector<Real>(X), src_Nt, src_Np, sctl::Vector<Real>(B), biest::Parity::Odd);
+  biest::WriteVTK("Bext", NFP, false, Nt, Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(Bext), biest::Parity::Odd);
+  biest::WriteVTK("Bext_dot_n", NFP, false, Nt, Np, sctl::Vector<Real>(X), trg_Nt, trg_Np, sctl::Vector<Real>(Bext_dot_n), biest::Parity::Odd);
 }
 
 int main() {

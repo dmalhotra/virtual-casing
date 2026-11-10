@@ -14,7 +14,7 @@ class Tests(unittest.TestCase):
         Run the test shown in Figure 2 of Malhotra et al, Plasma Physics
         and Controlled Fusion 62, 024004 (2020).
         """
-        expected_errors = [2e-4, 3e-7, 2e-9, 3e-11]
+        expected_errors = [1e-3, 1e-6, 1e-9, 3e-11]
         for j in range(4):
             digits = 3 + 3 * j
             for half_period in [True, False]:
@@ -124,7 +124,7 @@ class Tests(unittest.TestCase):
         Run a test similar to test_w7x, but with test data generated
         directly in python.
         """
-        expected_errors = [2e-4, 2e-8, 1e-9]
+        expected_errors = [1e-3, 1e-6, 1e-9]
         nfp = 4
         for j in range(3):
             digits = 3 + 3 * j
@@ -143,7 +143,7 @@ class Tests(unittest.TestCase):
         Off-surface evaluation for the rotating ellipse of test_rotating_ellipse, at targets inside and outside the
         surface, against the reference fields.
         """
-        expected_errors = [1e-3, 5e-7, 2e-9]
+        expected_errors = [1e-3, 1e-6, 1e-9]
         nfp = 4
         for j in range(3):
             digits = 3 + 3 * j

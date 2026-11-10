@@ -209,13 +209,14 @@ template <class Real> class VirtualCasing {
     static void CrossProd(sctl::Vector<Real>& AcrossB, const sctl::Vector<Real>& A, const sctl::Vector<Real>& B);
 
     sctl::Comm comm_;
-    mutable biest::FieldPeriodBIOp<Real,COORD_DIM,3,3> BiotSavartFxU;
-    mutable biest::FieldPeriodBIOp<Real,COORD_DIM,1,3> LaplaceFxdU;
-    mutable biest::FieldPeriodBIOp<Real,COORD_DIM,3,9, 8> BiotSavartFxdU;
-    mutable biest::FieldPeriodBIOp<Real,COORD_DIM,1,9, 8> LaplaceFxd2U;
+    mutable biest::FieldPeriodBIOp<Real> BiotSavartFxU;
+    mutable biest::FieldPeriodBIOp<Real> LaplaceFxdU;
+    mutable biest::FieldPeriodBIOp<Real,8> BiotSavartFxdU;
+    mutable biest::FieldPeriodBIOp<Real,8> LaplaceFxd2U;
     sctl::Vector<biest::Surface<Real>> Svec;
     bool half_period_;
     sctl::Integer NFP_, digits_;
+    sctl::Integer tor_orient_; // biest::SurfaceOp::ToroidalOrientation() of the surface
     sctl::Long src_Nt_, src_Np_;
     sctl::Long trg_Nt_, trg_Np_;
     mutable sctl::Long quad_Nt_, quad_Np_;
