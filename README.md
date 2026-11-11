@@ -68,7 +68,7 @@ If you use virtual-casing, or code derived from it, please cite the software and
   title     = {virtual-casing: the virtual-casing principle on toroidal surfaces},
   url       = {https://github.com/hiddenSymmetries/virtual-casing},
   doi       = {10.5281/zenodo.23619289},
-  version   = {0.3.1},
+  version   = {0.3.2},
   year      = {2026}
 }
 
