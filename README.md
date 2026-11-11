@@ -77,7 +77,7 @@ If you use virtual-casing, or code derived from it, please cite the software and
   title     = {{BIEST}: Boundary Integral Equation Solver for {Taylor} states},
   url       = {https://github.com/dmalhotra/BIEST},
   doi       = {10.5281/zenodo.23511944},
-  version   = {1.0.0},
+  version   = {2.0.0},
   year      = {2026}
 }
 
@@ -86,7 +86,7 @@ If you use virtual-casing, or code derived from it, please cite the software and
   title     = {{SCTL}: Scientific Computing Template Library},
   url       = {https://github.com/dmalhotra/SCTL},
   doi       = {10.5281/zenodo.23511629},
-  version   = {2.0.0},
+  version   = {2.1.0},
   year      = {2026}
 }
 
